@@ -23,10 +23,17 @@
 
 void calc_CG_2DES(t_non *non){
     printf("Hello world!\n");
+    CG_2DES_doorway(non,1,1);
+    CG_2DES_P_DA(non,1);
     return;
 }
-void CG_2DES_doorway(t_non *non,float *re_doorway,float *im_doorway);
-void CG_2DES_P_DA(t_non *non,float *P_DA);
+void CG_2DES_doorway(t_non *non,float *re_doorway,float *im_doorway){
+    printf("Calculate doorway part!\n");
+    return;
+};
+void CG_2DES_P_DA(t_non *non,float *P_DA){
+    printf("Calculate population transfer!\n");
+};
 void CG_2DES_window_GB(t_non *non,float *re_window_GB,float *im_window_GB);
 void CG_2DES_window_SE(t_non *non,float *re_window_SE,float *im_window_SE);
 void CG_2DES_window_EA(t_non *non,float *re_window_EA,float *im_window_EA);
