@@ -13,6 +13,7 @@
 #include "NISE_subs.h"
 #include "polar.h"
 #include "calc_CG_2DES.h"
+#include "propagate.h"
 #include <stdarg.h>
 #include "project.h"
 
@@ -29,16 +30,14 @@ void calc_CG_2DES(t_non *non){
     FILE *outone;
 
     P_DA=(float *)calloc(non->tmax2*sizeof(K)/sizeof(K[0]),sizeof(float));
-    printf("%f\n",P_DA[100]);
-    // CG_2DES_P_DA(non,P_DA,K);
+    CG_2DES_P_DA(non,P_DA,K);
     // Write to file
     outone=fopen("KPop.dat","w");
     for (int t1=0;t1<non->tmax2;t1+=non->dt1){
         fprintf(outone,"%f ",t1*non->deltat);
-        for (int a=0;a<non->singles;a++){
-            for (int b=0;b<non->singles;b++){
-                fprintf(outone,"%e ",P_DA[t1+(non->singles*b+a)*non->tmax2]);
-                printf("%e ",P_DA[t1+(non->singles*b+a)*non->tmax2]);
+        for (int a=0;a<pro_dim;a++){
+            for (int b=0;b<pro_dim;b++){
+                fprintf(outone,"%f ",P_DA[t1+(non->singles*b+a)*non->tmax2]);
             }
         }
         fprintf(outone,"\n"); 
@@ -46,48 +45,52 @@ void calc_CG_2DES(t_non *non){
     fclose(outone);
     free(P_DA);
     return;
-}
+};
+
 void CG_2DES_doorway(t_non *non,float *re_doorway,float *im_doorway){
     printf("Calculate doorway part!\n");
     return;
 };
+
 void CG_2DES_P_DA(t_non *non,float *P_DA,float K[]){
     printf("Calculate population transfer!\n");
     // int index, N;
-    // float *tau, *Kt;
-    // float *cnr, *cni;
-    // float *crr, *cri;
+    float *eigK, *Kt;
+    float *cnr;
+    float *crr;
     // float re, im;
-    // int a, b, c;
-    // N = non->singles;
-    // H = (float *)calloc(N * N, sizeof(float));
-    // e = (float *)calloc(N, sizeof(float));
-    // cnr = (float *)calloc(N * N, sizeof(float));
-    // crr = (float *)calloc(N * N, sizeof(float));
+    int a, b, c;
+    int N = 2;
+    
+    cnr = (float *)calloc(N * N, sizeof(float));
+    crr = (float *)calloc(N * N, sizeof(float));
+    
+    diagonalizeLPD(&K[0], eigK, N);
+    printf("%d\n",N);
+    // P(t2) = exp(-K*t2)
+    // Loop over t2
+    for (int nt2 = 0; nt2<non->tmax2; nt2++) {
+    for (a = 0; a < N; a++) {
+        Kt[a] = exp(-eigK[a] * nt2 * non->deltat);
+    }
 
-    // diagonalizeLPD(K, tau, N);
-    // // P(t) = exp(-K*t)
-    // for (a = 0; a < N; a++) {
-    //     Kt[a] = cos(e[a] * t);
-    // }
-
-    // /* Transform to site basis */
-    // for (a = 0; a < N; a++) {
-    //     for (b = 0; b < N; b++) {
-    //         cnr[b + a * N] += H[b + a * N] * re_U[b];
-    //     }
-    // }
-    // for (a = 0; a < N; a++) {
-    //     for (b = 0; b < N; b++) {
-    //         for (c = 0; c < N; c++) {
-    //             crr[a + c * N] += H[b + a * N] * cnr[b + c * N];
-    //         }
-    //     }
-    // }
-    // /* The one exciton propagator has been calculated */
+    /* Transform to site basis */
+    for (a = 0; a < N; a++) {
+        for (b = 0; b < N; b++) {
+            cnr[b + a * N] += K[b + a * N] * Kt[b];
+        }
+    }
+    for (a = 0; a < N; a++) {
+        for (b = 0; b < N; b++) {
+            for (c = 0; c < N; c++) {
+                P_DA[nt2+(a + c * N)*non->tmax2] += K[b + a * N] * cnr[b + c * N];
+            }
+        }
+    }
+    /* The one exciton propagator has been calculated */
 
     // for (a = 0; a < N; a++) {
-    //     cnr[a] = 0, cni[a] = 0;
+    //     cnr[a] = 0;
     //     for (b = 0; b < N; b++) {
     //         cnr[a] += crr[a + b * N] * cr[b];
     //     }
@@ -96,10 +99,10 @@ void CG_2DES_P_DA(t_non *non,float *P_DA,float K[]){
     // for (a = 0; a < N; a++) {
     //     cr[a] = cnr[a];
     // }
+    }
 
-
-    // free(cnr), free(re_U), free(H), free(e);
-    // free(crr);
+    free(cnr);
+    free(crr);
 
     return;
 };
