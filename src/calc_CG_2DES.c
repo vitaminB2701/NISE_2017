@@ -25,7 +25,7 @@
 void calc_CG_2DES(t_non *non){
     printf("Hello world!\n");
     float *P_DA;
-    float K[] = {0.1,0,-0.1,0.01};
+    float K[] = {-0.1,0.1,0.01,-0.011};
     int pro_dim=2;
     FILE *outone;
 
@@ -55,54 +55,73 @@ void CG_2DES_doorway(t_non *non,float *re_doorway,float *im_doorway){
 void CG_2DES_P_DA(t_non *non,float *P_DA,float K[]){
     printf("Calculate population transfer!\n");
     // int index, N;
-    float *eigK, *Kt;
+    float *eigK_re, *eigK_im; // eigenvalues of K
+    float *evecL, *evecR; // eigenvectors of K
+    float *ivecR, *ivecL; //inverse eigenvectors of K
+    float *Kt; // expm(K*dt)
     float *cnr;
     float *crr;
     // float re, im;
     int a, b, c;
     int N = 2;
     
+    eigK_re = (float *)calloc(N*N,sizeof(float));
+    eigK_im = (float *)calloc(N*N,sizeof(float));
+    evecL = (float *)calloc(N*N,sizeof(float));
+    evecR = (float *)calloc(N*N,sizeof(float));
+    ivecL = (float *)calloc(N*N,sizeof(float));
+    ivecR = (float *)calloc(N*N,sizeof(float));
+    Kt = (float *)calloc(N,sizeof(float));
     cnr = (float *)calloc(N * N, sizeof(float));
     crr = (float *)calloc(N * N, sizeof(float));
-    
-    diagonalizeLPD(&K[0], eigK, N);
-    printf("%d\n",N);
+    diagonalize_real_nonsym(K, eigK_re, eigK_im, evecL, evecR, ivecL, ivecR, N);
+    // sgeev_("N","V",2,K,2,eigK);
+    printf("%f %f %f %f\n",evecR[0],evecR[1],evecR[2],evecR[3]);
+    printf("%f %f\n",eigK_re[0],eigK_re[1]);
+    printf("%f %f %f %f\n",ivecR[0],ivecR[1],ivecR[2],ivecR[3]);
     // P(t2) = exp(-K*t2)
     // Loop over t2
     for (int nt2 = 0; nt2<non->tmax2; nt2++) {
-    for (a = 0; a < N; a++) {
-        Kt[a] = exp(-eigK[a] * nt2 * non->deltat);
-    }
-
-    /* Transform to site basis */
-    for (a = 0; a < N; a++) {
-        for (b = 0; b < N; b++) {
-            cnr[b + a * N] += K[b + a * N] * Kt[b];
+        for (a = 0; a < N; a++) {
+            Kt[a] = exp(eigK_re[a] * nt2 * non->deltat);
         }
-    }
-    for (a = 0; a < N; a++) {
-        for (b = 0; b < N; b++) {
-            for (c = 0; c < N; c++) {
-                P_DA[nt2+(a + c * N)*non->tmax2] += K[b + a * N] * cnr[b + c * N];
+
+        /* Transform to site basis */
+        for (a = 0; a < N; a++) {
+            for (b = 0; b < N; b++) {
+                cnr[b + a * N] += evecR[b + a * N] * Kt[b];
             }
         }
-    }
-    /* The one exciton propagator has been calculated */
+        for (a = 0; a < N; a++) {
+            for (b = 0; b < N; b++) {
+                for (c = 0; c < N; c++) {
+                    P_DA[nt2+(a + c * N)*non->tmax2] += evecR[b + a * N] * cnr[b + c * N];
+                }
+            }
+        }
+        /* The one exciton propagator has been calculated */
 
-    // for (a = 0; a < N; a++) {
-    //     cnr[a] = 0;
-    //     for (b = 0; b < N; b++) {
-    //         cnr[a] += crr[a + b * N] * cr[b];
-    //     }
-    // }
+        // for (a = 0; a < N; a++) {
+        //     cnr[a] = 0;
+        //     for (b = 0; b < N; b++) {
+        //         cnr[a] += crr[a + b * N] * cr[b];
+        //     }
+        // }
 
-    // for (a = 0; a < N; a++) {
-    //     cr[a] = cnr[a];
-    // }
+        // for (a = 0; a < N; a++) {
+        //     cr[a] = cnr[a];
+        // }
     }
 
     free(cnr);
     free(crr);
+    free(eigK_im);
+    free(eigK_re);
+    free(Kt);
+    free(evecL);
+    free(evecR);
+    free(ivecL);
+    free(ivecR);
 
     return;
 };
@@ -114,3 +133,65 @@ void combine_CG_2DES(t_non *non,float *re_doorway,float *im_doorway,
     float *P_DA,float *re_window_GB,float *im_window_GB,
     float *re_window_SE,float *im_window_SE,float *re_window_EA,float *im_window_EA,
     float *re_2DES,float *im_2DES);
+
+void diagonalize_real_nonsym(float* K, float* eig_re, float* eig_im, float* evecL, float* evecR, float* ivecL, float* ivecR, int N) {
+    int INFO, lwork;
+    float *work, *Kcopy;
+    int i, j;
+    float *pivot;
+    /* Find lwork for diagonalization */
+    lwork = -1;
+    work = (float *)calloc(1, sizeof(float));
+    sgeev_("V", "V", &N, Kcopy, &N, eig_re, eig_im, evecL, &N, evecR, &N, work, &lwork, &INFO);
+    lwork = work[0];
+    free(work);
+    work = (float *)calloc(lwork, sizeof(float));
+    Kcopy = (float *)calloc(N * N, sizeof(float));
+    /* Copy matrix */
+    for (i = 0; i < N; i++) {
+        for (j = 0; j < N; j++) {
+            Kcopy[i * N + j] = K[i * N + j];
+        }
+    }
+    /* Do diagonalization*/
+    sgeev_("V", "V", &N, Kcopy, &N, eig_re, eig_im, evecL, &N, evecR, &N, work, &lwork, &INFO);
+    if (INFO != 0) {
+        printf("Something went wrong trying to diagonalize a matrix...\nExit code %d\n",INFO);
+        exit(0);
+    }
+    free(work);
+    printf("eigenvalue completed %p\n",eig_re);
+
+    /* Inverse right eigenvectors*/
+    pivot = (float *)calloc(N,sizeof(float));
+    sgetrf_(&N, &N, ivecR, &N, pivot, &INFO);
+    if (INFO != 0) {
+        printf("Something went wrong trying to factorize a matrix...\nExit code %d\n",INFO);
+        exit(0);
+    }
+
+    /* Find lwork for diagonalization */
+    lwork = -1;
+    work = (float *)calloc(1, sizeof(float));
+    sgetri_(&N, ivecR, &N, pivot, work, &lwork, &INFO);
+    lwork = work[0];
+    free(work);
+    work = (float *)calloc(lwork, sizeof(float));
+    /* Copy matrix */
+    for (i = 0; i < N; i++) {
+        for (j = 0; j < N; j++) {
+            ivecL[i * N + j] = evecL[i * N + j];
+            ivecR[i * N + j] = evecR[i * N + j];
+        }
+    }
+    sgetri_(&N, ivecR, &N, pivot, work, &lwork, &INFO);
+    if (INFO != 0) {
+        printf("Something went wrong trying to inverse a matrix...\nExit code %d\n",INFO);
+        exit(0);
+    }
+    // sgetrf_(&N, &N, ivecL, &N, pivot, &INFO);
+    // sgetri_(&N, ivecL, pivot, work, &lwork, &INFO);
+    /* Free space */
+    free(Kcopy), free(work), free(pivot);
+    return;
+}

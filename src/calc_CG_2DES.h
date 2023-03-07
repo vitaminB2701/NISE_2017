@@ -11,4 +11,5 @@ void combine_CG_2DES(t_non *non,float *re_doorway,float *im_doorway,
     float *P_DA,float *re_window_GB,float *im_window_GB,
     float *re_window_SE,float *im_window_SE,float *re_window_EA,float *im_window_EA,
     float *re_2DES,float *im_2DES);
+void diagonalize_real_nonsym(float* K, float* eig_re, float* eig_im, float* evecL, float* evecR, float* ivecL, float* ivecR, int N);
 #endif /* _calc_CG_2DES_ */

@@ -22,5 +22,8 @@ extern void ssyev_(
               int *lwork,
               int *info
               );
+// extern void sgeev_();
+// extern void sgetrf_();
+// extern void sgetri_();
 
 #endif // LAPACK
