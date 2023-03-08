@@ -25,20 +25,21 @@
 void calc_CG_2DES(t_non *non){
     printf("Hello world!\n");
     float *P_DA;
-    float K[] = {-0.1,0.1,0.01,-0.011};
-    float P0[] = {1,0,0,1};
-    int pro_dim=2;
+    float K[] = {-0.1,0.1,0.01,-0.011}; // To be changed to input from other routines
+    float P0[] = {1,0,0,1}; // To be changed to input from other routines
+    int sizeK = sizeof(K)/sizeof(K[0]);
+    int pro_dim = sqrt(sizeK);
     FILE *outone;
 
-    P_DA=(float *)calloc(non->tmax2*sizeof(K)/sizeof(K[0]),sizeof(float));
-    CG_2DES_P_DA(non,P_DA,K);
+    P_DA=(float *)calloc(non->tmax2*sizeK,sizeof(float));
+    CG_2DES_P_DA(non,P_DA,K,P0,pro_dim);
     // Write to file
     outone=fopen("KPop.dat","w");
-    for (int t1=0;t1<non->tmax2;t1+=non->dt1){
-        fprintf(outone,"%f ",t1*non->deltat);
+    for (int t2=0;t2<non->tmax2;t2+=non->dt2){
+        fprintf(outone,"%f ",t2*non->deltat);
         for (int a=0;a<pro_dim;a++){
             for (int b=0;b<pro_dim;b++){
-                fprintf(outone,"%f ",P_DA[t1+(non->singles*b+a)*non->tmax2]);
+                fprintf(outone,"%f ",P_DA[t2+(pro_dim*a+b)*non->tmax2]);
             }
         }
         fprintf(outone,"\n"); 
@@ -53,18 +54,15 @@ void CG_2DES_doorway(t_non *non,float *re_doorway,float *im_doorway){
     return;
 };
 
-void CG_2DES_P_DA(t_non *non,float *P_DA,float K[]){
+void CG_2DES_P_DA(t_non *non,float *P_DA,float* K, float* P0, int N){
     printf("Calculate population transfer!\n");
-    // int index, N;
     float *eigK_re, *eigK_im; // eigenvalues of K
     float *evecL, *evecR; // eigenvectors of K
     float *ivecR, *ivecL; //inverse eigenvectors of K
-    float *EKt; // expm(K*dt)
+    float *iP0;
     float *cnr;
     float *crr;
-    // float re, im;
     int a, b, c;
-    int N = 2;
     
     eigK_re = (float *)calloc(N*N,sizeof(float));
     eigK_im = (float *)calloc(N*N,sizeof(float));
@@ -72,9 +70,7 @@ void CG_2DES_P_DA(t_non *non,float *P_DA,float K[]){
     evecR = (float *)calloc(N*N,sizeof(float));
     ivecL = (float *)calloc(N*N,sizeof(float));
     ivecR = (float *)calloc(N*N,sizeof(float));
-    EKt = (float *)calloc(N,sizeof(float));
-    cnr = (float *)calloc(N * N, sizeof(float));
-    crr = (float *)calloc(N * N, sizeof(float));
+    iP0 = (float *)calloc(N*N,sizeof(float));
     diagonalize_real_nonsym(K, eigK_re, eigK_im, evecL, evecR, ivecL, ivecR, N);
     // printf("%f %f %f %f\n",evecR[0],evecR[1],evecR[2],evecR[3]);
     // printf("%f %f\n",eigK_re[0],eigK_re[1]);
@@ -86,45 +82,38 @@ void CG_2DES_P_DA(t_non *non,float *P_DA,float K[]){
         }
     }
 
-    // P(t2) = expm(-K*t2) = V*exp(EK*t2)/V
-
-        for (a = 0; a < N; a++) {
-            EKt[a] = exp(eigK_re[a] * non->deltat);
-        }
-
-        /* Multiply with eigenvector */
-        for (a = 0; a < N; a++) {
-            for (b = 0; b < N; b++) {
-                cnr[b + a * N] += EKt[b] * Kt[b];
+    // P(t2) = expm(-K*t2)*P(0) = evecR*exp(Eig*t2)*ivecR*P(0)
+    
+    for (a = 0; a < N; a++) {
+        for (b = 0; b < N; b++) {
+            for (c = 0; c < N; c++) {
+                iP0[a + c * N] += ivecR[a + b * N] * P0[b + c * N];
             }
         }
+    }    // iP0 = ivecR*P(0)
+
+    // Loop over t2
+    for (int nt2 = 0; nt2<non->tmax2; nt2++) {
+        cnr = (float *)calloc(N * N, sizeof(float));
+        for (a = 0; a < N; a++) {
+            for (b = 0; b < N; b++) {
+                cnr[a + b * N] += exp(eigK_re[a] * nt2 * non->deltat) * iP0[a + b*N];
+            }
+        }   // exp(Eig*t2)*iP0
+
         for (a = 0; a < N; a++) {
             for (b = 0; b < N; b++) {
                 for (c = 0; c < N; c++) {
-                    P_DA[nt2+(a + c * N)*non->tmax2] += evecR[b + a * N] * cnr[b + c * N];
+                    P_DA[nt2 + (a + c * N)*non->tmax2] += evecR[a + b * N] * cnr[b + c * N];
                 }
             }
-        }
-        /* The one exciton propagator has been calculated */
+        }   // evecR*cnr
+        free(cnr);
+    }
 
-        // for (a = 0; a < N; a++) {
-        //     cnr[a] = 0;
-        //     for (b = 0; b < N; b++) {
-        //         cnr[a] += crr[a + b * N] * cr[b];
-        //     }
-        // }
-
-        // for (a = 0; a < N; a++) {
-        //     cr[a] = cnr[a];
-        // }
-        // Loop over t2
-    for (int nt2 = 0; nt2<non->tmax2; nt2++) {}
-
-    free(cnr);
-    free(crr);
     free(eigK_im);
     free(eigK_re);
-    free(Kt);
+    free(iP0);
     free(evecL);
     free(evecR);
     free(ivecL);
@@ -141,11 +130,14 @@ void combine_CG_2DES(t_non *non,float *re_doorway,float *im_doorway,
     float *re_window_SE,float *im_window_SE,float *re_window_EA,float *im_window_EA,
     float *re_2DES,float *im_2DES);
 
+// Diagonalize real nonsymmetric matrix. Output eigenvalues, left and right eigenvectors.
 void diagonalize_real_nonsym(float* K, float* eig_re, float* eig_im, float* evecL, float* evecR, float* ivecL, float* ivecR, int N) {
     int INFO, lwork;
     float *work, *Kcopy;
     int i, j;
     float *pivot;
+
+    /* Diagonalization*/
     /* Find lwork for diagonalization */
     lwork = -1;
     work = (float *)calloc(1, sizeof(float));
@@ -167,7 +159,6 @@ void diagonalize_real_nonsym(float* K, float* eig_re, float* eig_im, float* evec
         exit(0);
     }
     free(work);
-    printf("eigenvalue completed %p\n",eig_re);
 
     /* Copy matrix */
     for (i = 0; i < N; i++) {
@@ -197,7 +188,7 @@ void diagonalize_real_nonsym(float* K, float* eig_re, float* eig_im, float* evec
     }
     free(work), free(pivot);
 
-        /* Inverse left eigenvectors*/
+    /* Inverse left eigenvectors*/
     pivot = (float *)calloc(N,sizeof(float));
     sgetrf_(&N, &N, ivecL, &N, pivot, &INFO);
     if (INFO != 0) {
