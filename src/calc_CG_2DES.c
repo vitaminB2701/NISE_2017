@@ -29,22 +29,10 @@ void calc_CG_2DES(t_non *non){
     float P0[] = {1,0,0,1}; // To be changed to input from other routines
     int sizeK = sizeof(K)/sizeof(K[0]);
     int pro_dim = sqrt(sizeK);
-    FILE *outone;
 
     P_DA=(float *)calloc(non->tmax2*sizeK,sizeof(float));
     CG_2DES_P_DA(non,P_DA,K,P0,pro_dim);
-    // Write to file
-    outone=fopen("KPop.dat","w");
-    for (int t2=0;t2<non->tmax2;t2+=non->dt2){
-        fprintf(outone,"%f ",t2*non->deltat);
-        for (int a=0;a<pro_dim;a++){
-            for (int b=0;b<pro_dim;b++){
-                fprintf(outone,"%f ",P_DA[t2+(pro_dim*a+b)*non->tmax2]);
-            }
-        }
-        fprintf(outone,"\n"); 
-    }
-    fclose(outone);
+    
     free(P_DA);
     return;
 };
@@ -61,8 +49,8 @@ void CG_2DES_P_DA(t_non *non,float *P_DA,float* K, float* P0, int N){
     float *ivecR, *ivecL; //inverse eigenvectors of K
     float *iP0;
     float *cnr;
-    float *crr;
     int a, b, c;
+    FILE *outone;
     
     eigK_re = (float *)calloc(N*N,sizeof(float));
     eigK_im = (float *)calloc(N*N,sizeof(float));
@@ -71,10 +59,9 @@ void CG_2DES_P_DA(t_non *non,float *P_DA,float* K, float* P0, int N){
     ivecL = (float *)calloc(N*N,sizeof(float));
     ivecR = (float *)calloc(N*N,sizeof(float));
     iP0 = (float *)calloc(N*N,sizeof(float));
+
+    // Diagonalize K matrix
     diagonalize_real_nonsym(K, eigK_re, eigK_im, evecL, evecR, ivecL, ivecR, N);
-    // printf("%f %f %f %f\n",evecR[0],evecR[1],evecR[2],evecR[3]);
-    // printf("%f %f\n",eigK_re[0],eigK_re[1]);
-    // printf("%f %f %f %f\n",ivecR[0],ivecR[1],ivecR[2],ivecR[3]);
     for (int a = 0; a<N; a++) {
         if (eigK_im[a]!=0) {
             printf("Transfer lifetime is not real!\n");
@@ -82,7 +69,7 @@ void CG_2DES_P_DA(t_non *non,float *P_DA,float* K, float* P0, int N){
         }
     }
 
-    // P(t2) = expm(-K*t2)*P(0) = evecR*exp(Eig*t2)*ivecR*P(0)
+    // Calculate P(t2) = expm(-K*t2)*P(0) = evecR*exp(Eig*t2)*ivecR*P(0)
     
     for (a = 0; a < N; a++) {
         for (b = 0; b < N; b++) {
@@ -111,6 +98,19 @@ void CG_2DES_P_DA(t_non *non,float *P_DA,float* K, float* P0, int N){
         free(cnr);
     }
 
+    // Write to file
+    outone=fopen("KPop.dat","w");
+    for (int t2=0;t2<non->tmax2;t2+=non->dt2){
+        fprintf(outone,"%f ",t2*non->deltat);
+        for (int a=0;a<N;a++){
+            for (int b=0;b<N;b++){
+                fprintf(outone,"%f ",P_DA[t2+(N*a+b)*non->tmax2]);
+            }
+        }
+        fprintf(outone,"\n"); 
+    }
+    fclose(outone);
+
     free(eigK_im);
     free(eigK_re);
     free(iP0);
@@ -121,6 +121,7 @@ void CG_2DES_P_DA(t_non *non,float *P_DA,float* K, float* P0, int N){
 
     return;
 };
+
 void CG_2DES_window_GB(t_non *non,float *re_window_GB,float *im_window_GB);
 void CG_2DES_window_SE(t_non *non,float *re_window_SE,float *im_window_SE);
 void CG_2DES_window_EA(t_non *non,float *re_window_EA,float *im_window_EA);
