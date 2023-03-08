@@ -26,6 +26,7 @@ void calc_CG_2DES(t_non *non){
     printf("Hello world!\n");
     float *P_DA;
     float K[] = {-0.1,0.1,0.01,-0.011};
+    float P0[] = {1,0,0,1};
     int pro_dim=2;
     FILE *outone;
 
@@ -58,7 +59,7 @@ void CG_2DES_P_DA(t_non *non,float *P_DA,float K[]){
     float *eigK_re, *eigK_im; // eigenvalues of K
     float *evecL, *evecR; // eigenvectors of K
     float *ivecR, *ivecL; //inverse eigenvectors of K
-    float *Kt; // expm(K*dt)
+    float *EKt; // expm(K*dt)
     float *cnr;
     float *crr;
     // float re, im;
@@ -71,25 +72,30 @@ void CG_2DES_P_DA(t_non *non,float *P_DA,float K[]){
     evecR = (float *)calloc(N*N,sizeof(float));
     ivecL = (float *)calloc(N*N,sizeof(float));
     ivecR = (float *)calloc(N*N,sizeof(float));
-    Kt = (float *)calloc(N,sizeof(float));
+    EKt = (float *)calloc(N,sizeof(float));
     cnr = (float *)calloc(N * N, sizeof(float));
     crr = (float *)calloc(N * N, sizeof(float));
     diagonalize_real_nonsym(K, eigK_re, eigK_im, evecL, evecR, ivecL, ivecR, N);
-    // sgeev_("N","V",2,K,2,eigK);
-    printf("%f %f %f %f\n",evecR[0],evecR[1],evecR[2],evecR[3]);
-    printf("%f %f\n",eigK_re[0],eigK_re[1]);
-    printf("%f %f %f %f\n",ivecR[0],ivecR[1],ivecR[2],ivecR[3]);
-    // P(t2) = exp(-K*t2)
-    // Loop over t2
-    for (int nt2 = 0; nt2<non->tmax2; nt2++) {
+    // printf("%f %f %f %f\n",evecR[0],evecR[1],evecR[2],evecR[3]);
+    // printf("%f %f\n",eigK_re[0],eigK_re[1]);
+    // printf("%f %f %f %f\n",ivecR[0],ivecR[1],ivecR[2],ivecR[3]);
+    for (int a = 0; a<N; a++) {
+        if (eigK_im[a]!=0) {
+            printf("Transfer lifetime is not real!\n");
+            exit(0);
+        }
+    }
+
+    // P(t2) = expm(-K*t2) = V*exp(EK*t2)/V
+
         for (a = 0; a < N; a++) {
-            Kt[a] = exp(eigK_re[a] * nt2 * non->deltat);
+            EKt[a] = exp(eigK_re[a] * non->deltat);
         }
 
-        /* Transform to site basis */
+        /* Multiply with eigenvector */
         for (a = 0; a < N; a++) {
             for (b = 0; b < N; b++) {
-                cnr[b + a * N] += evecR[b + a * N] * Kt[b];
+                cnr[b + a * N] += EKt[b] * Kt[b];
             }
         }
         for (a = 0; a < N; a++) {
@@ -111,7 +117,8 @@ void CG_2DES_P_DA(t_non *non,float *P_DA,float K[]){
         // for (a = 0; a < N; a++) {
         //     cr[a] = cnr[a];
         // }
-    }
+        // Loop over t2
+    for (int nt2 = 0; nt2<non->tmax2; nt2++) {}
 
     free(cnr);
     free(crr);
@@ -162,21 +169,6 @@ void diagonalize_real_nonsym(float* K, float* eig_re, float* eig_im, float* evec
     free(work);
     printf("eigenvalue completed %p\n",eig_re);
 
-    /* Inverse right eigenvectors*/
-    pivot = (float *)calloc(N,sizeof(float));
-    sgetrf_(&N, &N, ivecR, &N, pivot, &INFO);
-    if (INFO != 0) {
-        printf("Something went wrong trying to factorize a matrix...\nExit code %d\n",INFO);
-        exit(0);
-    }
-
-    /* Find lwork for diagonalization */
-    lwork = -1;
-    work = (float *)calloc(1, sizeof(float));
-    sgetri_(&N, ivecR, &N, pivot, work, &lwork, &INFO);
-    lwork = work[0];
-    free(work);
-    work = (float *)calloc(lwork, sizeof(float));
     /* Copy matrix */
     for (i = 0; i < N; i++) {
         for (j = 0; j < N; j++) {
@@ -184,13 +176,46 @@ void diagonalize_real_nonsym(float* K, float* eig_re, float* eig_im, float* evec
             ivecR[i * N + j] = evecR[i * N + j];
         }
     }
+
+    /* Inverse right eigenvectors*/
+    pivot = (float *)calloc(N,sizeof(float));
+    sgetrf_(&N, &N, ivecR, &N, pivot, &INFO);
+    if (INFO != 0) {
+        printf("Something went wrong trying to factorize right eigenvector matrix...\nExit code %d\n",INFO);
+        exit(0);
+    }    
+    lwork = -1; /* Find lwork for diagonalization */
+    work = (float *)calloc(1, sizeof(float));
+    sgetri_(&N, ivecR, &N, pivot, work, &lwork, &INFO);
+    lwork = work[0];
+    free(work);
+    work = (float *)calloc(lwork, sizeof(float));
     sgetri_(&N, ivecR, &N, pivot, work, &lwork, &INFO);
     if (INFO != 0) {
-        printf("Something went wrong trying to inverse a matrix...\nExit code %d\n",INFO);
+        printf("Something went wrong trying to inverse right eigenvector matrix...\nExit code %d\n",INFO);
         exit(0);
     }
-    // sgetrf_(&N, &N, ivecL, &N, pivot, &INFO);
-    // sgetri_(&N, ivecL, pivot, work, &lwork, &INFO);
+    free(work), free(pivot);
+
+        /* Inverse left eigenvectors*/
+    pivot = (float *)calloc(N,sizeof(float));
+    sgetrf_(&N, &N, ivecL, &N, pivot, &INFO);
+    if (INFO != 0) {
+        printf("Something went wrong trying to factorize left eigenvector matrix...\nExit code %d\n",INFO);
+        exit(0);
+    }    
+    lwork = -1; /* Find lwork for diagonalization */
+    work = (float *)calloc(1, sizeof(float));
+    sgetri_(&N, ivecL, &N, pivot, work, &lwork, &INFO);
+    lwork = work[0];
+    free(work);
+    work = (float *)calloc(lwork, sizeof(float));
+    sgetri_(&N, ivecL, &N, pivot, work, &lwork, &INFO);
+    if (INFO != 0) {
+        printf("Something went wrong trying to inverse left eigenvector matrix...\nExit code %d\n",INFO);
+        exit(0);
+    }
+
     /* Free space */
     free(Kcopy), free(work), free(pivot);
     return;
