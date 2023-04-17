@@ -25,8 +25,8 @@
 void calc_CG_2DES(t_non *non){
     printf("Hello world!\n");
     float *P_DA;
-    float K[] = {-0.1,0.1,0.01,-0.011}; // To be changed to input from other routines
-    float P0[] = {1,0,0,1}; // To be changed to input from other routines
+    float K[] = {-0.1,0.1,0.01,-0.011}; // To be changed to results from other routines
+    float P0[] = {1,0,0,1}; // To be changed to results from other routines
     int sizeK = sizeof(K)/sizeof(K[0]);
     int pro_dim = sqrt(sizeK);
 
@@ -131,7 +131,7 @@ void combine_CG_2DES(t_non *non,float *re_doorway,float *im_doorway,
     float *re_window_SE,float *im_window_SE,float *re_window_EA,float *im_window_EA,
     float *re_2DES,float *im_2DES);
 
-// Diagonalize real nonsymmetric matrix. Output eigenvalues, left and right eigenvectors.
+// Diagonalize real nonsymmetric matrix. Output complex eigenvalues, left and right eigenvectors.
 void diagonalize_real_nonsym(float* K, float* eig_re, float* eig_im, float* evecL, float* evecR, float* ivecL, float* ivecR, int N) {
     int INFO, lwork;
     float *work, *Kcopy;
@@ -171,18 +171,18 @@ void diagonalize_real_nonsym(float* K, float* eig_re, float* eig_im, float* evec
 
     /* Inverse right eigenvectors*/
     pivot = (float *)calloc(N,sizeof(float));
-    sgetrf_(&N, &N, ivecR, &N, pivot, &INFO);
+    sgetrf_(&N, &N, ivecR, &N, pivot, &INFO); //LU factorization
     if (INFO != 0) {
         printf("Something went wrong trying to factorize right eigenvector matrix...\nExit code %d\n",INFO);
         exit(0);
     }    
-    lwork = -1; /* Find lwork for diagonalization */
+    lwork = -1; 
     work = (float *)calloc(1, sizeof(float));
-    sgetri_(&N, ivecR, &N, pivot, work, &lwork, &INFO);
+    sgetri_(&N, ivecR, &N, pivot, work, &lwork, &INFO); //Find lwork for diagonalization
     lwork = work[0];
     free(work);
     work = (float *)calloc(lwork, sizeof(float));
-    sgetri_(&N, ivecR, &N, pivot, work, &lwork, &INFO);
+    sgetri_(&N, ivecR, &N, pivot, work, &lwork, &INFO); //Do inversion
     if (INFO != 0) {
         printf("Something went wrong trying to inverse right eigenvector matrix...\nExit code %d\n",INFO);
         exit(0);
@@ -191,18 +191,18 @@ void diagonalize_real_nonsym(float* K, float* eig_re, float* eig_im, float* evec
 
     /* Inverse left eigenvectors*/
     pivot = (float *)calloc(N,sizeof(float));
-    sgetrf_(&N, &N, ivecL, &N, pivot, &INFO);
+    sgetrf_(&N, &N, ivecL, &N, pivot, &INFO); //LU factorization
     if (INFO != 0) {
         printf("Something went wrong trying to factorize left eigenvector matrix...\nExit code %d\n",INFO);
         exit(0);
     }    
-    lwork = -1; /* Find lwork for diagonalization */
+    lwork = -1; 
     work = (float *)calloc(1, sizeof(float));
-    sgetri_(&N, ivecL, &N, pivot, work, &lwork, &INFO);
+    sgetri_(&N, ivecL, &N, pivot, work, &lwork, &INFO); // Find lwork for diagonalization
     lwork = work[0];
     free(work);
     work = (float *)calloc(lwork, sizeof(float));
-    sgetri_(&N, ivecL, &N, pivot, work, &lwork, &INFO);
+    sgetri_(&N, ivecL, &N, pivot, work, &lwork, &INFO); //Do inversion
     if (INFO != 0) {
         printf("Something went wrong trying to inverse left eigenvector matrix...\nExit code %d\n",INFO);
         exit(0);
